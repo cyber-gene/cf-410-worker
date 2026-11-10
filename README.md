@@ -1,61 +1,50 @@
 # 410 Gone Worker
 
-すべてのパス・HTTPメソッドに `410 Gone` を返すCloudflare Workerです。
-オリジンサーバーへの通信は行いません。HEADの本文は空、それ以外は日本語の案内文です。
-`Cache-Control: no-store` を返します。サービス終了を案内し、`Retry-After` は返しません。
-案内文を変更する場合は `src/index.js` を編集してください。
+すべてのパス・HTTPメソッドに `410 Gone` を返すCloudflare Workerです。サービス終了の案内に利用できます。
+オリジンサーバーにはアクセスせず、本文に `Gone` を返します（HEADの本文は空）。レスポンスは `Cache-Control: no-store` を指定しています。
 
-## ローカル確認とデプロイ
+## 適用手順
 
-Node.js 22以降とnpmを使用します。
+CloudflareのWeb UIからデプロイできます。ローカルへのNode.jsやnpmのインストールは不要です。
 
-```sh
-npm install
-npm test
-npm run dev
-```
+- このリポジトリを自分のGitHubアカウントにForkします。
+- Cloudflareダッシュボードの **Workers & Pages → Create application** からGitリポジトリのインポートを選び、GitHubを連携してForkしたリポジトリを選択します。
+- Worker名を `cf-410-worker`、ルートディレクトリをリポジトリ直下、ビルドコマンドを空欄、デプロイコマンドを `npx wrangler deploy` にしてデプロイします。Worker名は `wrangler.jsonc` の `name` と一致させます。
+- 表示された `workers.dev` URLで、本文が `Gone`、HTTPステータスが `410 Gone` になることを確認します。HTTPステータスはブラウザの開発者ツールのNetworkタブで確認できます。
 
-別のターミナルで応答を確認できます。
+### 既存サイトへの適用
 
-```sh
-curl -i http://localhost:8787/any/path
-curl -I http://localhost:8787/
-curl -i -X POST http://localhost:8787/api/example
-```
+- 既存サイトに適用する場合は、対象ドメインをCloudflareで管理し、対象ホストのDNSレコードを **Proxied（オレンジ色の雲）** にします。変更前の設定は控えておきます。
+- CloudflareダッシュボードでデプロイしたWorkerを開き、**Settings → Domains & Routes** からRouteを追加します。対象ゾーンを選び、`example.com/*` を登録します。`www.example.com/*` なども必要に応じて追加します。
+- `curl -i https://example.com/any/path` などで適用後の応答を確認します。
 
-Cloudflareにログインしてデプロイします。
+Routeはダッシュボードで管理します。より具体的なWorker Routeや、リダイレクト・Access・WAFなどの既存ルールがある場合は、対象URLへの適用状況も確認してください。
 
-```sh
-npx wrangler login
-npm run check
-npm run deploy
-```
+## メッセージの変更方法
 
-表示された `workers.dev` URLで410応答を確認してください。
+- `src/index.js` の `message` を変更します。改行もそのまま本文に反映されます。
 
-## 既存サイトの切り替え（Workers Route）
+  ```js
+  const message = `このサービスは終了しました。
+  ご利用ありがとうございました。`;
+  ```
 
-既存サイトをサービス終了の案内に切り替えるには、既存DNSの向き先を変えず、リクエストをWorkerで処理するRouteが便利です。
-オリジンが停止していても、このWorkerはオリジンにアクセスせず応答します。
+- GitHub上で編集する場合は、Forkしたリポジトリのデプロイ対象ブランチに変更をコミットします。Cloudflareが自動で再デプロイします。
+- デプロイ完了後、対象URLで表示内容を確認します。
 
-1. 対象ホストの既存DNSレコードがCloudflareで **Proxied（オレンジ色の雲）** であることを確認します。DNS onlyの場合は元の設定を記録してからProxiedへ変更します。
-2. CloudflareダッシュボードでデプロイしたWorkerを開き、Settings → Domains & RoutesからRouteを追加します。
-3. 対象ゾーンを選び、例として `example.com/*` を登録します。`www.example.com/*` など別のホストも必要に応じて追加します。スキームを省略するとHTTP/HTTPSの両方に適用されます。
-4. 対象URLを `curl -i https://example.com/any/path` などで確認します。既存のより具体的なWorker Routeがある場合は、そちらが優先されるため調整してください。
+## ローカルで確認・デプロイする場合
 
-Routeはダッシュボードで管理する前提のため、`wrangler.jsonc` に `routes` は記載していません。
-Cloudflareのリダイレクト・Access・WAF等で先に処理されるリクエストはWorkerまで到達しない場合があります。
-全URLで410が必要なら、それらの既存ルールも確認してください。
+- Node.js 22以降とnpmを用意し、リポジトリを取得します。
+- リポジトリ内で `npm install` を実行します。
+- `npm test` でテストし、`npm run dev` でローカルの表示を確認します。
+- `npx wrangler login` でCloudflareにログインします。
+- `npm run check` で設定を確認し、`npm run deploy` で反映します。
 
-復旧時は追加したRouteを削除し、元の応答を確認してください。DNS onlyから変更していた場合は、必要に応じて元の設定に戻します。
+## 適用の解除
 
-## DNSの向き先もWorkerへ変更する場合
+- 追加したRouteを削除し、元のサイトの応答を確認します。
+- DNSをDNS onlyからProxiedに変更していた場合は、必要に応じて元の設定に戻します。
 
-Workerの **Custom Domain** を使用します。単純に既存レコードを `workers.dev` へのCNAMEにする方法は使用しません。
-既存の同名A/AAAA/CNAMEレコードがある場合は競合するので、値・TTL・プロキシ設定を保存してから切り替えてください。
-復旧時はCustom Domainを解除し、保存したDNSレコードを復元します。一時的な運用には上記Routeの方が戻しやすくなります。
+DNSの向き先もWorkerへ変更する場合は、[Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)を利用してください。既存DNSレコードの値・TTL・プロキシ設定を保存してから切り替えます。
 
-公式ドキュメント:
-- [Workers Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)
-- [Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
-- [Wrangler設定](https://developers.cloudflare.com/workers/wrangler/configuration/)
+詳しくは[Web UIでのデプロイ](https://developers.cloudflare.com/workers/get-started/dashboard/)、[ビルド設定](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)、[Workers Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)を参照してください。
