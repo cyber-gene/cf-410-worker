@@ -48,3 +48,7 @@ Routeはダッシュボードで管理します。より具体的なWorker Route
 DNSの向き先もWorkerへ変更する場合は、[Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)を利用してください。既存DNSレコードの値・TTL・プロキシ設定を保存してから切り替えます。
 
 詳しくは[Web UIでのデプロイ](https://developers.cloudflare.com/workers/get-started/dashboard/)、[ビルド設定](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)、[Workers Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)を参照してください。
+
+## ライセンス
+
+[MIT License](LICENSE)
